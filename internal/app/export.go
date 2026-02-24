@@ -76,7 +76,7 @@ func RunExport(cfg *config.Config) error {
 					if err := store.Save(ctx, item.ID, *item.BackdropPath, imageData); err != nil {
 						fmt.Printf("[storage] %s - 背景图图存储失败: %v\n", title, err)
 					} else {
-						fmt.Printf("[storage] %s - 海报图存储成功\n", title)
+						fmt.Printf("[storage] %s - 背景图存储成功\n", title)
 					}
 				} else {
 					fmt.Printf("[image] %s - 图片下载失败: %v\n", title, err)
