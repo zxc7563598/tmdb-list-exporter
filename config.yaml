@@ -1,0 +1,14 @@
+tmdb:
+  access_token: # API 读访问令牌，可前往 https://www.themoviedb.org/settings/api 获取
+  list_id: # 片单ID，可在片单网页链接中查看，例如 https://www.themoviedb.org/list/8634743-anime-series 的 ID 就是 8634743
+
+storage:
+  drivers: # 根据自己的需要进行配置，全部注释则不进行图片存储
+    - type: local # 本地存储
+      local_path: ./images # 本地存储路径
+    # - type: alioss # 阿里云 OSS 存储
+    #   alioss_region: cn-shanghai # region，详见阿里云 OSS 控制台
+    #   alioss_bucket: xxxxxxx # bucket，详见阿里云 OSS 控制台
+    #   alioss_path: xxxxxx # 上传文件夹路径，最前面不要带 /
+    #   alioss_access_key_id: xxxxx # 阿里云 Access Key
+    #   alioss_access_key_secret: xxxxx # 阿里云 Secret Key
