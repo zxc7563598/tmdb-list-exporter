@@ -1,190 +1,130 @@
-# 🎬 tmdb-list-exporter
+# tmdb-list-exporter
 
-<div align="center">
-  <a href="./README.md">English</a>｜<a href="./README.zh-CN.md">简体中文</a>
-  <hr width="50%"/>
-</div>
+[English](./README.md) ｜ 简体中文
 
-> 一个基于 TMDB API 的片单导出 CLI 工具  
-> 用于快速获取指定片单信息为 JSON 文件，并支持下载封面 / 背景图进行本地或 OSS 存储。
+基于 TMDB API 的片单导出命令行工具。自动拉取指定片单的全部数据，导出为格式化 JSON，同时下载封面图和背景图，支持本地文件系统和阿里云 OSS 等多种存储方式。
 
-**本项目已经经由 Zread 解析完成，如果需要快速了解项目，可以点击此处进行查看：[了解本项目](https://zread.ai/zxc7563598/tmdb-list-exporter)**
+> 本项目已由 [Zread](https://zread.ai/zxc7563598/tmdb-list-exporter) 解析，可点击链接快速了解项目结构和代码逻辑。
 
----
+## 使用场景
 
-## ✨ 项目简介
+- 搭建个人影视墙或番剧展示页
+- 为静态站点提供影视数据
+- NAS 本地影视展示与数据归档
+- 需要将 TMDB 图片转存到自有存储的场合
 
-​`tmdb-list-exporter` 是一个命令行工具，用于：
+## 特性
 
-- 抓取指定 TMDB 片单的完整数据
-- 导出为结构化 JSON 文件
-- 下载封面图与背景图
-- 支持多种存储方式（本地 / 阿里云 OSS）
+- 自动分页拉取，3 路并发加速多页请求
+- 8 路并发下载封面图和背景图
+- 支持多存储驱动：本地文件系统 / 阿里云 OSS，可同时启用
+- 指数退避重试机制，自动处理 HTTP 429 限流和网络抖动
+- 支持通过环境变量覆盖配置（`TMDB_` 前缀）
+- 5 平台交叉编译（macOS / Linux / Windows，amd64 + arm64）
 
-它特别适合：
+## 技术栈
 
-- 个人影视墙
-- 番剧展示页
-- 静态站点生成
-- NAS 本地影视展示
-- 数据备份与归档
+- 语言：Go 1.25
+- CLI 框架：[Cobra](https://github.com/spf13/cobra) + [Viper](https://github.com/spf13/viper)
+- OSS SDK：[alibabacloud-oss-go-sdk-v2](https://github.com/aliyun/alibabacloud-oss-go-sdk-v2)
 
----
+## 安装
 
-## 🚀 为什么做这个工具？
+前往 [GitHub Releases](https://github.com/zxc7563598/tmdb-list-exporter/releases) 下载对应平台的二进制文件：
 
-我做这个工具的初衷，是为了在个人网站上展示一个电影 / 番剧墙。
+- macOS（amd64 / arm64）
+- Linux（amd64 / arm64）
+- Windows（amd64）
 
-问题在于：
-
-- 手动收集影视信息非常麻烦
-- 还要额外找封面图和背景图
-- 引用第三方图片资源容易出现网络问题
-- 没有一个平台可以完整统一地获取所有信息
-
-于是参考一些 NAS 方案，我选择直接抓取 ​**TMDB 的片单数据**，并进行本地化处理：
-
-- 所有信息 JSON 化
-- 所有图片本地存储或上传 OSS
-- 完全自主可控
-- 展示时无需依赖外部图片 CDN
-
-这样就可以非常方便地构建属于自己的影视展示页面。
-
----
-
-## 🧩 功能特性
-
-- 导出 TMDB 片单为格式化 JSON 文件
-- 自动分页拉取全部数据
-- 下载封面图（Poster）
-- 下载背景图（Backdrop）
-- 多存储驱动支持
-  - 本地文件系统
-  - 阿里云 OSS
-
-- 自动重试机制（429 限流处理）
-
----
-
-## 📦 安装方式
-
-前往 GitHub Releases 页面下载对应平台的二进制文件：
-
-- macOS
-- Linux
-- Windows
-
-下载后赋予执行权限：
+下载后赋予执行权限并运行：
 
 ```bash
 chmod +x tmdb
-```
-
-然后即可运行：
-
-```bash
 ./tmdb --help
 ```
 
----
+也可以从源码编译，见[本地开发](#本地开发)。
 
-## 🛠 使用方法
+## 快速开始
 
-执行：
+### 1. 获取 TMDB Access Token
 
-```bash
-./tmdb --help
-```
+1. 注册 [TMDB](https://www.themoviedb.org/) 账号
+2. 进入 [API 设置页面](https://www.themoviedb.org/settings/api)
+3. 申请 API Key，获取 **API Read Access Token**（不是 API Key）
 
-输出如下：
-
-```bash
-tmdb-list-exporter 是一个基于 TMDB API 的片单导出工具。
-
-支持：
-  • 导出片单为格式化 JSON 文件
-  • 下载封面图片
-  • 多存储驱动( 本地 / 阿里云 OSS )
-
-Usage:
-  tmdb [flags]
-  tmdb [command]
-
-Examples:
-  # 生成默认配置文件
-  tmdb init
-  # 使用默认配置文件运行
-  tmdb --config=config.yaml
-  # 指定其他配置文件
-  tmdb --config=configs/prod.yaml
-
-Available Commands:
-  help        Help about any command
-  init        生成默认配置文件
-
-Flags:
-      --config string   配置文件(默认为config.yaml)
-  -h, --help            help for tmdb
-```
-
----
-
-## ⚙️ 配置说明
-
-你可以通过：
+### 2. 生成配置文件
 
 ```bash
 tmdb init
 ```
 
-生成默认配置文件。
+命令会在当前目录生成 `config.yaml`，按注释填写配置即可。
 
-示例 `config.yaml`：
+### 3. 运行
+
+```bash
+tmdb --config=config.yaml
+```
+
+## 配置说明
+
+完整配置示例：
 
 ```yaml
 tmdb:
-  access_token: "你的TMDB访问令牌"
-  list_id: 123456
+  access_token: "你的 TMDB Read Access Token"
+  list_id: 8634743  # 片单 ID，从片单 URL 中获取
+
+output:
+  file: tmdbList.json  # 导出的 JSON 文件名
 
 storage:
-  drivers:
+  drivers:  # 留空则不存储图片
     - type: local
-      local_path: "./output"
-
+      local_path: ./images
     - type: alioss
-      alioss_region: "cn-shanghai"
-      alioss_bucket: "your-bucket"
-      alioss_path: "images"
-      alioss_access_key_id: "your-ak"
-      alioss_access_key_secret: "your-sk"
+      alioss_region: cn-shanghai
+      alioss_bucket: your-bucket
+      alioss_path: images
+      alioss_access_key_id: your-access-key
+      alioss_access_key_secret: your-secret-key
 ```
 
----
+> [!NOTE]
+> `alioss_path` 为上传路径，**不要**以 `/` 开头。
 
-## 🔐 如何获取 TMDB Access Token
+### 片单 ID 如何获取
 
-1. 注册 TMDB 账号
-2. 进入 API 设置页面
-3. 申请 API Key
-4. 使用 **API Read Access Token**
+打开 TMDB 片单页面，URL 中的数字即为 list_id。例如 `https://www.themoviedb.org/list/8634743-anime-series` 中的 `8634743`。
 
----
+### 环境变量
 
-## 📁 输出结构示例
+所有配置项支持通过环境变量覆盖，前缀为 `TMDB_`，使用下划线分隔层级：
 
-假设你启用了本地存储：
-
-```
-output/
-  12345/
-    poster.jpg
-    backdrop.jpg
-  67890/
-    poster.jpg
+```bash
+export TMDB_ACCESS_TOKEN="your-token"
+export TMDB_LIST_ID="8634743"
 ```
 
-JSON 示例：
+环境变量的优先级高于配置文件。
+
+## 输出结构
+
+运行后会在当前目录生成 JSON 文件，图片按条目 ID 分别存放：
+
+```
+.
+├── tmdbList.json
+└── images/
+    ├── 12345/
+    │   ├── poster.jpg
+    │   └── backdrop.jpg
+    └── 67890/
+        └── poster.jpg
+```
+
+JSON 格式示例：
 
 ```json
 {
@@ -198,10 +138,28 @@ JSON 示例：
 }
 ```
 
----
+## 本地开发
 
-# ⭐ 如果这个工具对你有帮助
+```bash
+# 克隆仓库
+git clone https://github.com/zxc7563598/tmdb-list-exporter.git
+cd tmdb-list-exporter
 
-欢迎 Star ⭐
+# 安装依赖
+go mod download
 
-如果你也在做影视墙、番剧墙、NAS 展示页，希望这个工具能帮到你。
+# 编译当前平台
+go build -o tmdb .
+
+# 交叉编译全部平台
+make build-all
+```
+
+## 为什么做这个工具
+
+我想在个人网站上展示一个电影/番剧墙，但手动收集影视信息、找封面图、处理图片外链都很麻烦，也没有一个平台能统一获取所有信息。于是我选择直接从 TMDB 抓取片单数据并本地化处理——所有信息 JSON 化、图片自托管，展示时不再依赖外部 CDN。如果你也在做类似的事情，希望这个工具能帮到你。
+
+## 致谢
+
+- 数据来源：[TMDB](https://www.themoviedb.org/)
+- 项目快速概览：[Zread](https://zread.ai/zxc7563598/tmdb-list-exporter)
