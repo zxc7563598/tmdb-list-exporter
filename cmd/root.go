@@ -33,18 +33,14 @@ var rootCmd = cobra.Command{
 	Long:    long,
 	Example: example,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// 加载配置文件
 		cfg, err := config.Load(cfgFile)
 		if err != nil {
 			return err
 		}
-		// 验证参数
 		if err := cfg.Validate(); err != nil {
 			return err
 		}
-		// 打印基本信息
 		fmt.Printf("读取片单: %d \n", cfg.TMDB.ListID)
-		// 执行
 		if err := app.RunExport(cfg); err != nil {
 			return err
 		}
@@ -55,6 +51,9 @@ var rootCmd = cobra.Command{
 var configTemplate = `tmdb:
   access_token: # API 读访问令牌，可前往 https://www.themoviedb.org/settings/api 获取
   list_id: # 片单ID，可在片单网页链接中查看，例如 https://www.themoviedb.org/list/8634743-anime-series 的 ID 就是 8634743
+
+output:
+  file: tmdbList.json # 导出 JSON 文件名
 
 storage:
   drivers: # 根据自己的需要进行配置，全部注释则不进行图片存储
@@ -70,15 +69,18 @@ storage:
 var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "生成默认配置文件",
-	Run: func(cmd *cobra.Command, args []string) {
-		content := configTemplate
-		os.WriteFile("config.yaml", []byte(content), 0644)
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if err := os.WriteFile("config.yaml", []byte(configTemplate), 0644); err != nil {
+			return fmt.Errorf("生成配置文件失败: %w", err)
+		}
 		fmt.Println("已生成 config.yaml, 请填写配置后重新运行。")
+		return nil
 	},
 }
 
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
+		fmt.Fprintf(os.Stderr, "错误: %v\n", err)
 		os.Exit(1)
 	}
 }

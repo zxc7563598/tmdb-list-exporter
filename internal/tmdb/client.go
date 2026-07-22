@@ -14,7 +14,7 @@ import (
 //   - 构造 API 请求
 //   - 处理认证信息
 //   - 管理 HTTP 连接池
-//   - 实现限流重试机制
+//   - 实现限流重试机制（同时处理网络错误和 429 响应）
 type Client struct {
 	baseURL string
 	token   string
@@ -44,10 +44,10 @@ func NewClient(AccessToken string) *Client {
 		baseURL: "https://api.themoviedb.org/3",
 		token:   AccessToken,
 		http: &http.Client{
-			Timeout: time.Second * 15, // 整个请求最多15秒
+			Timeout: time.Second * 15,
 			Transport: &http.Transport{
-				MaxIdleConns:    10,               // 最多保持10个空闲连接
-				IdleConnTimeout: 25 * time.Second, // 空闲连接最多保持25秒
+				MaxIdleConns:    10,
+				IdleConnTimeout: 25 * time.Second,
 			},
 		},
 	}
@@ -58,9 +58,6 @@ func NewClient(AccessToken string) *Client {
 // 参数：
 //
 //	urlOptions - key/value 形式的参数映射
-//
-// 行为：
-//   - 将 map 转换为标准 URL 编码格式
 //
 // 示例：
 //
@@ -73,7 +70,10 @@ func NewClient(AccessToken string) *Client {
 //
 //	page=1&language=zh-CN
 func buildQuery(urlOptions map[string]string) string {
-	values := url.Values{}
+	if len(urlOptions) == 0 {
+		return ""
+	}
+	values := make(url.Values, len(urlOptions))
 	for k, v := range urlOptions {
 		values.Set(k, v)
 	}
@@ -82,42 +82,73 @@ func buildQuery(urlOptions map[string]string) string {
 
 // doRequestWithRetry 执行 HTTP 请求并支持自动重试。
 //
+// 对以下情况执行指数退避重试：
+//   - HTTP 429 (Too Many Requests)
+//   - 网络瞬时错误（连接超时、连接重置等）
+//   - 5xx 服务端错误
+//
+// 不重试：
+//   - context 取消（返回 ctx.Err()）
+//   - 4xx 客户端错误（429 除外）
+//
+// 退避策略：2^i 秒 + 随机抖动（0~500ms）
+//
 // 参数：
 //
 //	req      - 已构造完成的 HTTP 请求
 //	maxRetry - 最大重试次数
 //
-// 行为：
-//   - 发起请求
-//   - 若返回 429 (Too Many Requests)，执行指数退避重试
-//   - 退避策略：2^i 秒 + 随机抖动
-//
-// 重试策略说明：
-//
-//	第 0 次重试：1 秒 + 随机抖动
-//	第 1 次重试：2 秒 + 随机抖动
-//	第 2 次重试：4 秒 + 随机抖动
-//	...
-//
-// 抖动（jitter）用于避免多个客户端同时重试造成“雪崩”。
-//
 // 返回：
 //
 //	*http.Response - 成功响应
-//	error          - 请求失败或超过最大重试次数
+//	error          - 超过最大重试次数仍失败
 func (c *Client) doRequestWithRetry(req *http.Request, maxRetry int) (*http.Response, error) {
+	var lastErr error
 	for i := 0; i <= maxRetry; i++ {
 		resp, err := c.http.Do(req)
+
+		// 网络层错误（DNS 解析失败、连接超时、连接重置等）→ 重试
 		if err != nil {
-			return nil, err
+			// context 取消则不重试
+			if req.Context().Err() != nil {
+				return nil, err
+			}
+			lastErr = err
+			if i < maxRetry {
+				backoff := time.Duration(1<<i) * time.Second
+				jitter := time.Duration(rand.Intn(500)) * time.Millisecond
+				time.Sleep(backoff + jitter)
+			}
+			continue
 		}
-		if resp.StatusCode != http.StatusTooManyRequests {
-			return resp, nil
+
+		// 429 限流 → 重试
+		if resp.StatusCode == http.StatusTooManyRequests {
+			resp.Body.Close()
+			lastErr = fmt.Errorf("HTTP 429: Too Many Requests")
+			backoff := time.Duration(1<<i) * time.Second
+			jitter := time.Duration(rand.Intn(500)) * time.Millisecond
+			time.Sleep(backoff + jitter)
+			continue
 		}
-		resp.Body.Close()
-		backoff := time.Duration(1<<i) * time.Second
-		jitter := time.Duration(rand.Intn(500)) * time.Millisecond
-		time.Sleep(backoff + jitter)
+
+		// 5xx 服务端错误 → 重试
+		if resp.StatusCode >= 500 {
+			resp.Body.Close()
+			lastErr = fmt.Errorf("HTTP %d: server error", resp.StatusCode)
+			if i < maxRetry {
+				backoff := time.Duration(1<<i) * time.Second
+				jitter := time.Duration(rand.Intn(500)) * time.Millisecond
+				time.Sleep(backoff + jitter)
+			}
+			continue
+		}
+
+		// 2xx / 3xx / 4xx（非 429）→ 直接返回
+		return resp, nil
 	}
-	return nil, fmt.Errorf("请求失败，达到最大重试次数")
+	return nil, fmt.Errorf("请求失败，达到最大重试次数: %w", lastErr)
 }
+
+// ImageBaseURL 为 TMDB 原始图片 CDN 地址。
+const ImageBaseURL = "https://image.tmdb.org/t/p/original"

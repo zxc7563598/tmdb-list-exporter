@@ -82,15 +82,15 @@ func NewAliossStorage(accessKeyID string, accessKeySecret string, region string,
 // 返回：
 //
 //	error - 上传失败时返回错误
-func (l *AliossStorage) Save(ctx context.Context, id int64, filename string, data []byte) error {
+func (a *AliossStorage) Save(ctx context.Context, id int64, filename string, data []byte) error {
 	// 构造请求
 	request := &oss.PutObjectRequest{
-		Bucket: oss.Ptr(l.Bucket),
-		Key:    oss.Ptr(filepath.Join(l.BasePath, strconv.FormatInt(id, 10), filename)),
+		Bucket: oss.Ptr(a.Bucket),
+		Key:    oss.Ptr(filepath.Join(a.BasePath, strconv.FormatInt(id, 10), filename)),
 		Body:   bytes.NewReader(data),
 	}
 	// 执行上传
-	_, err := l.Client.PutObject(ctx, request)
+	_, err := a.Client.PutObject(ctx, request)
 	if err != nil {
 		return fmt.Errorf("阿里云OSS存储失败: %w", err)
 	}
